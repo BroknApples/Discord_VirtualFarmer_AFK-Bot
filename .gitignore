@@ -1,4 +1,5 @@
 .vscode/
 venv/
-*.zip
+__pycache__/
 logs/
+*.zip
