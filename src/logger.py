@@ -16,7 +16,7 @@ class Logger:
 
   # ==================== Variables ====================
 
-  init = False
+  initialized = False
   terminal = False
   timestamp = False
   logfile = None
@@ -24,7 +24,7 @@ class Logger:
   # ================ Private Functions ================
 
   @classmethod
-  def _getCurrentTimeFormatted(cls) -> str:
+  def _getCurrentTimeFormatted(cls, format_override: str = "") -> str:
     """
     Gets the current time and returns it in a formatted string
     [YYYY-MM-DD_HH-MM-SS]
@@ -34,13 +34,14 @@ class Logger:
     """
 
     now = datetime.now()
-    return now.strftime("%Y-%m-%d_%H-%M-%S")  # YYYY-MM-DD_HH-MM-SS
+    time_format = format_override if format_override else "%Y/%m/%d %H:%M:%S" # YYYY/MM/DD HH:MM:SS
+    return now.strftime(time_format)
 
 
   # ================ Public Functions ================
 
   @classmethod
-  def isInit(cls) -> bool: return cls.init
+  def isInit(cls) -> bool: return cls.initialized
 
   @classmethod
   def setTerminalPrint(cls, val: bool): cls.terminal = val
@@ -70,7 +71,7 @@ class Logger:
 
     # Prevent reinitialization
     if cls.isInit():
-      print("[ERROR] Cannot intialize a new logger")
+      print("[Logger] ERROR: Cannot intialize a new logger")
       return
 
     cls.terminal = print_to_terminal
@@ -78,10 +79,12 @@ class Logger:
 
     # Create file in the log directory
     os.makedirs(log_dir, exist_ok=True)
-    cls.logfile = open(f"{log_dir}/logfile - {cls._getCurrentTimeFormatted()}.txt", "a", encoding="utf-8", buffering=1)
+    cls.logfile = open(f"{log_dir}/logfile - {cls._getCurrentTimeFormatted("%Y-%m-%d_%H-%M-%S")}.txt", "a", encoding="utf-8", buffering=1)
+    Logger.log("", f"Discord Virtual Farmer AFK Bot Logfile - {cls._getCurrentTimeFormatted()}\n", True)
 
     # Mark logger as initialized
-    cls.init = True
+    cls.initialized = True
+    print("[Logger] Logger successfully initialiezd!")
 
 
   @classmethod
@@ -90,7 +93,7 @@ class Logger:
     Uninitialze the Logger class
     """
 
-    cls.init = False
+    cls.initialized = False
     cls.terminal = False
     cls.timestamp = False
     if cls.logfile:
@@ -99,7 +102,7 @@ class Logger:
 
 
   @classmethod
-  def log(cls, header: str, message: str):
+  def log(cls, header: str, message: str, disable_timestamp: bool = False):
     """
     Docstring for log
     
@@ -107,13 +110,15 @@ class Logger:
     :type header: str
     :param message: Data to print/log
     :type message: str
+    :param disable_timestamp: Should the timestamp be disable when printing?
+    :type disable_timestamp: bool
     """
 
     # Get the final string to print/log
-    spacer = " " if header else "" # Only add a spacer if the header is not an empty string or None
-    final_msg: str = f"[{header}]{spacer}{message}"
-    if cls.isTimestampPrint():
-      final_msg = f"<{cls._getCurrentTimeFormatted()}>    {final_msg}"
+    header_text = f"[{header}] " if header else "" # Only add a spacer if the header is not an empty string or None
+    final_msg: str = f"{header_text}{message}"
+    if not disable_timestamp and cls.isTimestampPrint():
+      final_msg = f"{cls._getCurrentTimeFormatted()}    {final_msg}"
 
     # Print to the terminal if set to terminal print mode
     if cls.isTerminalPrint():

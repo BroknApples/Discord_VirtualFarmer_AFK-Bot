@@ -1,3 +1,6 @@
 pywinauto
-win32gui
-win32con
+pywin32
+psutil
+numpy
+opencv-python
+rapidocr_onnxruntime
