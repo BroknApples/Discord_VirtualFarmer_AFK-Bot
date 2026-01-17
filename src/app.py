@@ -129,7 +129,6 @@ class App(tk.Tk):
             int(((btn_box[1] + btn_box[3]) / 2) + jitter_y)
           )
 
-          Logger.log(App._LOG_HEADER, f"Clicking with jitter at: {click_target}")
           self.auto_gui.click(click_target)
           self.last_click = time.time()
           return True # Found and clicked
