@@ -79,7 +79,7 @@ class Logger:
 
     # Create file in the log directory
     os.makedirs(log_dir, exist_ok=True)
-    cls.logfile = open(f"{log_dir}/logfile - {cls._getCurrentTimeFormatted("%Y-%m-%d_%H-%M-%S")}.txt", "a", encoding="utf-8", buffering=1)
+    cls.logfile = open(f"{log_dir}/logfile - {cls._getCurrentTimeFormatted('%Y-%m-%d_%H-%M-%S')}.txt", "a", encoding="utf-8", buffering=1)
     Logger.log("", f"Discord Virtual Farmer AFK Bot Logfile - {cls._getCurrentTimeFormatted()}\n", True)
 
     # Mark logger as initialized
