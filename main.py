@@ -3,7 +3,9 @@ from src.window_manager import WindowManager
 from src.logger import Logger
 from src.auto_gui import AutoGui
 from src.element_detector import ElementDetector
+from src.app import App
 import cv2
+
 
 if __name__ == "__main__":
   # Constants
@@ -15,6 +17,10 @@ if __name__ == "__main__":
   ElementDetector.init()
   window_manager = WindowManager()
   windows = window_manager.gatherOpenWindows()
+
+  app = App()
+  app.mainloop()
+  exit()
 
 
   # Loop through every found window
