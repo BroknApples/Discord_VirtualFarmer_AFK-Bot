@@ -16,6 +16,8 @@ class Logger:
 
   # ==================== Variables ====================
 
+  _LOG_HEADER: str = "Logger"
+
   initialized = False
   terminal = False
   timestamp = False
@@ -71,7 +73,7 @@ class Logger:
 
     # Prevent reinitialization
     if cls.isInit():
-      print("[Logger] ERROR: Cannot intialize a new logger")
+      Logger.log(Logger._LOG_HEADER, "ERROR: Cannot intialize a new logger")
       return
 
     cls.terminal = print_to_terminal
@@ -84,7 +86,7 @@ class Logger:
 
     # Mark logger as initialized
     cls.initialized = True
-    print("[Logger] Logger successfully initialiezd!")
+    Logger.log(Logger._LOG_HEADER, "Successfully initialized module.")
 
 
   @classmethod

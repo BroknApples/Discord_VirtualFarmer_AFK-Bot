@@ -59,7 +59,7 @@ class AutoGui:
     :type absolute: bool
     """
 
-    Logger.log(AutoGui._LOG_HEADER, f"Clicking at position {pos}; absolute: {absolute}.")
+    Logger.log(AutoGui._LOG_HEADER, f"Clicking at position {pos} | absolute={absolute}")
     self.win.click_input(coords=pos, absolute=absolute)
 
 
@@ -71,5 +71,5 @@ class AutoGui:
     :type text: str
     """
 
-    Logger.log(AutoGui._LOG_HEADER, f"Typing \"{text}\".")
+    Logger.log(AutoGui._LOG_HEADER, f"Typing \"{text}\"")
     self.win.type_keys(text)

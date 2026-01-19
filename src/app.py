@@ -35,22 +35,58 @@ class App(tk.Tk):
   _FARM_BUTTON_TEXT = "farm"
   _DISCORD_COMMAND_TEXT = "used /"
   _CROP_LEFT = 0.15 # How much of the image to crop off the left side
-  _CROP_RIGHT = 1.0 - (0.20) # How much of the image to crop off the right side
+  _CROP_RIGHT = 1.0 - (0.20) # How much of the image to crop off the right side | NOTE: Change the parentheses value.
+  _CROP_TOP = 0.1 # How much of the image to crop off the top side
+  _CROP_BOTTOM = 1.0 - (0.1) # How much of the image to crop off the bottom side | NOTE: Change the parentheses value.
   _MAX_VERTICAL_GAP = 500 # px
 
   # ================ Private Functions ================
 
   def _threadedFarm(self):
     """
-    Wrapper that runs in the background thread
+    Background farming loop with fixed-rate scheduling
     """
 
     self.is_processing = True
+    self.stop_event.clear()
     try:
-      self._autoFarm()
+      interval = random.uniform(self.lower_bound, self.upper_bound)
+      next_time = time.time()
+      Logger.log(App._LOG_HEADER, f"First run scheduled in {interval:.2f}s")
+
+      while self.running:
+        now = time.time()
+        sleep_time = next_time - now
+
+        # Wait, but can be interrupted
+        if sleep_time > 0:
+          self.stop_event.wait(timeout=sleep_time)
+        
+        # Stop immediately if requested
+        if not self.running or self.stop_event.is_set():
+          break
+
+        start = time.time()
+        clicked = self._autoFarm()
+        end = time.time()
+
+        runtime = end - start
+
+        # Schedule next run
+        interval = random.uniform(self.lower_bound, self.upper_bound)
+        next_time += interval
+
+        # Catch up if OCR ran long
+        if next_time < time.time():
+          Logger.log(App._LOG_HEADER, f"OCR overran interval (runtime={runtime:.2f}s), rescheduling")
+          next_time = time.time() + interval
+
+        delay = max(0.0, next_time - time.time())
+        Logger.log(App._LOG_HEADER, f"Cycle done | Clicked={clicked} | Runtime={runtime:.2f}s | Next run in {delay:.2f}s")
+
     finally:
-      # Always set to False, even if _autoFarm crashes
       self.is_processing = False
+      Logger.log(App._LOG_HEADER, "Thread exited cleanly")
   
 
   def _autoFarm(self) -> bool:
@@ -62,29 +98,34 @@ class App(tk.Tk):
     """
 
     # Check if function should run
-    if not self.found: return
-    if (self.click_interval is not None) and \
-      (time.time() - self.last_click < self.click_interval):
-      return
-
-    # Calculate new click interval
-    self.click_interval = random.uniform(self.lower_bound, self.upper_bound)
-
+    if not self.found: return False
 
     # Get discord texture & find text
     screenshot = self.window_manager.getWindowTextureFromHwnd(self.target_hwnd)
-    all_text = ElementDetector.detectText(screenshot)
-    if not all_text: return
+    img_height, img_width = screenshot.shape[:2]
 
-    img_width = screenshot.shape[1]
+    # ---- Crop bounds ----
+    left   = int(img_width * App._CROP_LEFT)
+    right  = int(img_width * App._CROP_RIGHT)
+    top    = int(img_height * App._CROP_TOP)       # New: crop top
+    bottom = int(img_height * App._CROP_BOTTOM)    # New: crop bottom
+
+    # Crop the screenshot
+    cropped_screenshot = screenshot[top:bottom, left:right]
+
+    # Run OCR on cropped image
+    all_text = ElementDetector.detectText(cropped_screenshot)
+    if not all_text: return False
+
+    # Leave function if stop button was pressed
+    if not self.is_processing: return False
+
+    # Shift boxes back to original screenshot coordinates
     chat_elements = []
     for text, box in all_text:
-      # TODO: Update to remove the need for these bounds
-      # Adjust these percentages if your Discord layout is different
-      # Ignores the left 15% and right 20% of the screen
-      x_min = box[0]
-      if (img_width * App._CROP_LEFT) < x_min < (img_width * App._CROP_RIGHT):
-        chat_elements.append((text, box))
+      x_min, y_min, x_max, y_max = box
+      shifted_box = (x_min + left, y_min + top, x_max + left, y_max + top)
+      chat_elements.append((text, shifted_box))
 
 
     # Search bottom-up for the most recent message in the chat
@@ -129,9 +170,13 @@ class App(tk.Tk):
             int(((btn_box[1] + btn_box[3]) / 2) + jitter_y)
           )
 
+          # One last processing check
+          if not self.is_processing or not self.running or (self.stop_event and self.stop_event.is_set()):
+            Logger.log(App._LOG_HEADER, "Stopped signal detected, skipping click")
+            return False
+
           self.auto_gui.click(click_target)
-          self.last_click = time.time()
-          return True # Found and clicked
+          return True  # Found and clicked
     
     return False
 
@@ -271,9 +316,9 @@ class App(tk.Tk):
     self.target_title, self.target_hwnd = self._findExeWindow(windows, App._TARGET_EXE)
     self.auto_gui = AutoGui(self.target_title) if self.found else None
 
-    self.last_click = time.time()
     self.click_interval = None
     self.is_processing = False
+    self.stop_event = threading.Event()
 
     self.lower_bound = 2.5
     self.upper_bound = 4.5
@@ -317,11 +362,11 @@ class App(tk.Tk):
 
     # Start timers
     if self.start_time is None:
+      Logger.log(App._LOG_HEADER, f"Started Bot ==> Player: {self.target_player} | Lower: {self.lower_bound} | Upper: {self.upper_bound}")
       self.start_time = time.time()
       self.updateButtonText()
-      self.scheduleNextFarm()
+      threading.Thread(target=self._threadedFarm, daemon=True).start() # Start running the farm
 
-    Logger.log(App._LOG_HEADER, f"Started Bot ==> Player: {self.target_player} | Lower: {self.lower_bound} | Upper: {self.upper_bound}")
 
 
   def onStop(self):
@@ -334,9 +379,12 @@ class App(tk.Tk):
       self.after_cancel(self.timer_job)
       self.timer_job = None
 
-    # Reset start time
     self.start_time = None
     Logger.log(App._LOG_HEADER, "Stopped Bot")
+
+    # Signal the thread to exit immediately
+    self.running = False
+    self.stop_event.set()
 
 
   def updateButtonText(self):
@@ -354,19 +402,3 @@ class App(tk.Tk):
     delay: int = 100 if elapsed < 60 else 1_000
     self.timer_job = self.after(delay, self.updateButtonText)
   
-
-  def scheduleNextFarm(self):
-    """
-    Handles 'When' to click
-    """
-    if not self.running: return
-
-    # If the previous OCR thread is still running, skip this tick
-    if not self.is_processing:
-      # Create and start the thread
-      # daemon=True ensures the thread dies when you close the app
-      threading.Thread(target=self._threadedFarm, daemon=True).start()
-
-    # Calculate next delay and schedule
-    new_interval = random.uniform(self.lower_bound, self.upper_bound)
-    self.after(int(new_interval * 1000), self.scheduleNextFarm)
